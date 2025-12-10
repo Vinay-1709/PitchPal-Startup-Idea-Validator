@@ -1,41 +1,35 @@
-import { GoogleGenAI, Type, Schema, Chat } from "@google/genai";
-import { AnalysisResult, PitchDeckSlide, AnalysisResponse } from "../types";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Type, Schema } from "@google/genai/schemas";
+import { AnalysisResponse } from "../types";
 
-// Initialize Gemini Client (FIXED)
-const ai = new GoogleGenAI({
-  apiKey: import.meta.env.VITE_GEMINI_API_KEY
-});
+// Initialize Gemini Client (Browser safe)
+const ai = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
-// Analysis Schema
+// ----------------------- SCHEMAS --------------------------
 const analysisSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    score: { type: Type.INTEGER, description: "A viability score from 0 to 100" },
-    feasibility: { type: Type.STRING, description: "Analysis of technical and operational feasibility" },
-    marketAnalysis: { type: Type.STRING, description: "Market size, trends, and growth potential" },
-    customerSegments: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Target audience segments" },
-    problemSolution: { type: Type.STRING, description: "Validation of the problem and proposed solution fit" },
-    competitors: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Key competitors in the space" },
-    businessModel: { type: Type.STRING, description: "Revenue streams and cost structure insights" },
-    sources: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of real or general sources/references used for data" },
-    estimatedInvestment: { type: Type.STRING, description: "Estimated initial investment range in INR (₹…)" },
+    score: { type: Type.INTEGER },
+    feasibility: { type: Type.STRING },
+    marketAnalysis: { type: Type.STRING },
+    customerSegments: { type: Type.ARRAY, items: { type: Type.STRING }},
+    problemSolution: { type: Type.STRING },
+    competitors: { type: Type.ARRAY, items: { type: Type.STRING }},
+    businessModel: { type: Type.STRING },
+    sources: { type: Type.ARRAY, items: { type: Type.STRING }},
+    estimatedInvestment: { type: Type.STRING },
     costBreakdown: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
         properties: {
-          category: { type: Type.STRING, description: "Cost category (e.g., Labor, Raw Materials, SaaS, Marketing)" },
-          amount: { type: Type.NUMBER, description: "Estimated cost amount in INR" }
+          category: { type: Type.STRING },
+          amount: { type: Type.NUMBER }
         },
         required: ["category", "amount"]
-      },
-      description: "Breakdown of initial costs in INR"
+      }
     },
-    suggestions: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: "3–5 actionable suggestions to improve the idea"
-    }
+    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }}
   },
   required: [
     "score",
@@ -52,21 +46,19 @@ const analysisSchema: Schema = {
   ]
 };
 
-// Pitch Deck Schema
 const pitchDeckSchema: Schema = {
   type: Type.ARRAY,
   items: {
     type: Type.OBJECT,
     properties: {
       title: { type: Type.STRING },
-      content: { type: Type.ARRAY, items: { type: Type.STRING } },
+      content: { type: Type.ARRAY, items: { type: Type.STRING }},
       notes: { type: Type.STRING }
     },
     required: ["title", "content", "notes"]
   }
 };
 
-// Combined Schema
 const combinedSchema: Schema = {
   type: Type.OBJECT,
   properties: {
@@ -76,69 +68,73 @@ const combinedSchema: Schema = {
   required: ["analysis", "pitchDeck"]
 };
 
-// Main Analysis + Pitch Deck Function
-export const analyzeIdeaAndGenerateDeck = async (ideaText: string): Promise<AnalysisResponse> => {
+// ----------------------- MAIN FUNCTION ----------------------
+
+export const analyzeIdeaAndGenerateDeck = async (
+  ideaText: string
+): Promise<AnalysisResponse> => {
   try {
-    const model = "gemini-2.5-flash";
-
-    let promptText = `Analyze the following startup idea and generate a pitch deck.
-
-Startup Idea: "${ideaText}"
-
-Provide a JSON response containing:
-1. Detailed analysis (feasibility, market, customer segments, problem/solution, competitors, business model, and score 0–100)
-2. A structured 10-slide pitch deck (Title, Problem, Solution, Market, Product, Business Model, Competitors, GTM, Financials, Team/Summary)
-3. Sources/references used
-4. Estimated initial investment range (INR)
-5. Cost breakdown (INR)
-6. Actionable suggestions to improve the idea`;
-
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: promptText,
-      config: {
+    const modelInstance = ai.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: combinedSchema,
-        temperature: 0.7
+        temperature: 0.7,
+        responseSchema: combinedSchema
       }
     });
 
-    if (response.text) {
-      return JSON.parse(response.text) as AnalysisResponse;
-    } else {
-      throw new Error("No data received from AI");
-    }
+    const prompt = `
+Analyze the following startup idea and generate a pitch deck:
+
+Idea: "${ideaText}"
+
+Output:
+1. Full viability analysis
+2. Structured 10-slide pitch deck
+3. INR investment estimate
+4. INR cost breakdown
+5. 3–5 recommendations
+`;
+
+    const result = await modelInstance.generateContent(prompt);
+
+    const text = result.response.text();
+    return JSON.parse(text) as AnalysisResponse;
 
   } catch (error) {
-    console.error("Error generating analysis:", error);
+    console.error("AI error:", error);
     throw error;
   }
 };
 
-// Consultant Chat Session
-export const createConsultantChat = (analysisData: AnalysisResponse, originalIdea: string): Chat => {
-  const context = `
-You are a startup consultant helping the user refine their idea: "${originalIdea}".
+// ----------------------- CHAT FUNCTION ----------------------
+
+export const createConsultantChat = (analysisData: AnalysisResponse, idea: string) => {
+  const modelInstance = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const chat = modelInstance.startChat({
+    history: [
+      {
+        role: "user",
+        parts: [{
+          text: `
+You are a startup consultant.
+Idea: "${idea}"
 
 Analysis Summary:
-Score: ${analysisData.analysis.score}/100
+Score: ${analysisData.analysis.score}
 Feasibility: ${analysisData.analysis.feasibility}
 Market: ${analysisData.analysis.marketAnalysis}
 Competitors: ${analysisData.analysis.competitors.join(", ")}
 Business Model: ${analysisData.analysis.businessModel}
-Estimated Investment: ${analysisData.analysis.estimatedInvestment}
+Investment: ${analysisData.analysis.estimatedInvestment}
 
-Answer follow-up questions concisely and helpfully.
-`;
-
-  return ai.chats.create({
-    model: "gemini-2.5-flash",
-    config: {
-      systemInstruction: "You are an expert startup consultant. Use the context provided to help the user."
-    },
-    history: [
-      { role: "user", parts: [{ text: context }] },
-      { role: "model", parts: [{ text: "I have reviewed the analysis. Ask me anything!" }] }
+Provide helpful, concise advice.
+`
+        }]
+      }
     ]
   });
+
+  return chat;
 };
