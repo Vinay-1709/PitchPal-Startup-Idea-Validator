@@ -94,31 +94,3 @@ export const analyzeIdeaAndGenerateDeck = async (ideaText: string): Promise<Anal
     throw error;
   }
 };
-
-export const createConsultantChat = (analysisData: AnalysisResponse, originalIdea: string): Chat => {
-  const context = `
-    You are a startup consultant helper for the project idea: "${originalIdea}".
-    
-    Here is the analysis you just generated:
-    Score: ${analysisData.analysis.score}/100
-    Feasibility: ${analysisData.analysis.feasibility}
-    Market: ${analysisData.analysis.marketAnalysis}
-    Competitors: ${analysisData.analysis.competitors.join(', ')}
-    Business Model: ${analysisData.analysis.businessModel}
-    Estimated Investment: ${analysisData.analysis.estimatedInvestment}
-    
-    The user may ask follow-up questions about this analysis, specific slides, or ask for advice on next steps.
-    Answer concisely and helpfully.
-  `;
-
-  return ai.chats.create({
-    model: "gemini-2.5-flash",
-    config: {
-      systemInstruction: "You are an expert startup consultant. Use the provided context to answer user questions about their specific startup idea.",
-    },
-    history: [
-      { role: "user", parts: [{ text: context }] },
-      { role: "model", parts: [{ text: "I understand the project context and analysis. I am ready to answer follow-up questions." }] }
-    ]
-  });
-};

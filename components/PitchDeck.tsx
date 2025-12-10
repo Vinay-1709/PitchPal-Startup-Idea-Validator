@@ -1,6 +1,6 @@
 import React from 'react';
 import { PitchDeckSlide } from '../types';
-import { FileDown, MonitorPlay } from 'lucide-react';
+import { MonitorPlay } from 'lucide-react';
 
 interface PitchDeckProps {
   slides: PitchDeckSlide[];
@@ -17,10 +17,6 @@ const PitchDeck: React.FC<PitchDeckProps> = ({ slides }) => {
           </h2>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Structure generated based on investor best practices.</p>
         </div>
-        <button className="flex items-center px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 shadow-sm rounded-lg text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors no-print">
-          <FileDown className="w-4 h-4 mr-2" />
-          Export to TXT
-        </button>
       </div>
 
       <div className="grid gap-6">

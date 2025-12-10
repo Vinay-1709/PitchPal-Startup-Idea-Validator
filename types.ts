@@ -34,8 +34,3 @@ export enum AppState {
   RESULT = 'RESULT',
   ERROR = 'ERROR'
 }
-
-export interface ChatMessage {
-  role: 'user' | 'model';
-  text: string;
-}
